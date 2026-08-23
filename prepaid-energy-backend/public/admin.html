@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Admin Control Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #f0f2f5; --text-color: #333; --card-bg: #ffffff; 
+            --header-bg: #1e293b; --accent-main: #f59e0b; 
+            --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); --border-radius: 16px;
+            --input-bg: #f8fafc; --input-border: #cbd5e1;
+        }
+
+        body.dark-mode {
+            --bg-color: #0f172a; --text-color: #f1f5f9; --card-bg: #1e293b; 
+            --header-bg: #0b1120; --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            --input-bg: #334155; --input-border: #475569;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 20px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; background: var(--header-bg); color: white; border-radius: var(--border-radius); margin-bottom: 30px; box-shadow: var(--box-shadow); }
+        .header-title h1 { font-size: 1.5em; display: flex; align-items: center; gap: 10px; color: var(--accent-main); }
+        .header-actions { display: flex; gap: 15px; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; border: none; }
+        .btn-toggle { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-back { background: #3b82f6; color: white; }
+
+        .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 30px; max-width: 1200px; margin: 0 auto; }
+        @media (min-width: 768px) { .dashboard-grid { grid-template-columns: 1fr 1fr; } }
+        
+        .card { background: var(--card-bg); border-radius: var(--border-radius); padding: 25px; box-shadow: var(--box-shadow); }
+        .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--input-border); font-size: 1.3em; font-weight: bold; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 0.9em; opacity: 0.8; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); font-size: 1em; outline: none; }
+        .form-group input:focus, .form-group select:focus { border-color: var(--accent-main); }
+        
+        .btn-submit { width: 100%; padding: 12px; background: var(--accent-main); color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; margin-top: 10px; cursor: pointer; }
+        .btn-submit:hover { filter: brightness(1.1); }
+        
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-success { background: #10b981; color: white; }
+
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: var(--card-bg); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); text-align: center; width: 350px; }
+    </style>
+</head>
+<body>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="margin-bottom: 20px; color: var(--text-color);"><i class="fas fa-lock"></i> Admin Login</h2>
+            <div class="form-group">
+                <input type="password" id="admin-pass" placeholder="Enter PIN (1234)">
+            </div>
+            <button class="btn btn-submit" onclick="login()">Access System</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="header-title">
+            <h1><i class="fas fa-sliders-h"></i> System Administration</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-toggle" onclick="toggleDarkMode()"><i id="theme-icon" class="fas fa-moon"></i></button>
+            <a href="/" class="btn btn-back"><i class="fas fa-arrow-left"></i> Back to Live View</a>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        
+        <!-- Tariff Config -->
+        <div class="card">
+            <div class="card-header" style="color: var(--accent-main);"><i class="fas fa-coins"></i> Tariff Configuration</div>
+            <div class="form-group"><label>Tier 1 Rate (Lifeline <= 30 kWh):</label><input type="number" id="t1" step="0.0001"></div>
+            <div class="form-group"><label>Tier 2 Rate (31 - 300 kWh):</label><input type="number" id="t2" step="0.0001"></div>
+            <div class="form-group"><label>Tier 3 Rate (> 300 kWh):</label><input type="number" id="t3" step="0.0001"></div>
+            <button class="btn btn-submit" onclick="updateTariffs()">Update System Tariffs</button>
+        </div>
+
+        <!-- Global Controls -->
+        <div class="card">
+            <div class="card-header" style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Global System Controls</div>
+            <p style="margin-bottom: 20px; opacity: 0.8; font-size: 0.95em;">Zero out all room balances to test immediate relay tripping on both channels. This action cannot be undone.</p>
+            <button class="btn btn-submit btn-danger" onclick="zeroBalances()"><i class="fas fa-skull"></i> Zero Out All Balances</button>
+        </div>
+
+        <!-- Room A Override -->
+        <div class="card">
+            <div class="card-header" style="color: #3b82f6;"><i class="fas fa-door-closed"></i> Room A Direct Override</div>
+            <div class="form-group"><label>Set Balance (GH₵):</label><input type="number" id="bal1" step="0.0001"></div>
+            <div class="form-group"><label>Set Cumulative Usage (kWh):</label><input type="number" id="kwh1" step="0.01"></div>
+            <div class="form-group">
+                <label>Force Relay Hardware State:</label>
+                <select id="rel1">
+                    <option value="ON">ON (Power Active)</option>
+                    <option value="OFF">OFF (Power Cut)</option>
+                </select>
+            </div>
+            <button class="btn btn-submit btn-success" onclick="overrideRoom(1)">Execute Room A Override</button>
+        </div>
+
+        <!-- Room B Override -->
+        <div class="card">
+            <div class="card-header" style="color: #8b5cf6;"><i class="fas fa-door-closed"></i> Room B Direct Override</div>
+            <div class="form-group"><label>Set Balance (GH₵):</label><input type="number" id="bal2" step="0.0001"></div>
+            <div class="form-group"><label>Set Cumulative Usage (kWh):</label><input type="number" id="kwh2" step="0.01"></div>
+            <div class="form-group">
+                <label>Force Relay Hardware State:</label>
+                <select id="rel2">
+                    <option value="ON">ON (Power Active)</option>
+                    <option value="OFF">OFF (Power Cut)</option>
+                </select>
+            </div>
+            <button class="btn btn-submit btn-success" onclick="overrideRoom(2)">Execute Room B Override</button>
+        </div>
+
+    </div>
+
+    <script>
+        let adminToken = "";
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, background: 'var(--card-bg)', color: 'var(--text-color)' });
+
+        // Theme Setup
+        if(localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('theme-icon').classList.replace('fa-moon', 'fa-sun');
+        }
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('theme-icon').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        }
+
+        // Login Logic
+        function login() {
+            const pass = document.getElementById('admin-pass').value;
+            fetch('/api/admin/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ password: pass }) })
+            .then(res => res.json())
+            .then(res => {
+                if(res.success) {
+                    adminToken = res.token;
+                    document.getElementById('login-overlay').style.display = 'none';
+                    loadAdminData();
+                    Toast.fire({ icon: 'success', title: 'Authentication Successful' });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Access Denied', text: 'Incorrect PIN', background: 'var(--card-bg)', color: 'var(--text-color)' });
+                }
+            });
+        }
+
+        function getAuthHeaders() {
+            return { 'Content-Type': 'application/json', 'x-admin-password': adminToken };
+        }
+
+        function loadAdminData() {
+            fetch('/api/admin/config', { headers: getAuthHeaders() }).then(res => res.json()).then(data => {
+                document.getElementById('t1').value = data.tier1_rate;
+                document.getElementById('t2').value = data.tier2_rate;
+                document.getElementById('t3').value = data.tier3_rate;
+            });
+            fetch('/api/rooms').then(res => res.json()).then(rooms => {
+                rooms.forEach(r => {
+                    document.getElementById(`bal${r.sensor_id}`).value = r.balance.toFixed(4);
+                    document.getElementById(`kwh${r.sensor_id}`).value = r.total_kwh;
+                    document.getElementById(`rel${r.sensor_id}`).value = r.relay_status;
+                });
+            });
+        }
+
+        function updateTariffs() {
+            const payload = {
+                tier1_rate: parseFloat(document.getElementById('t1').value),
+                tier2_rate: parseFloat(document.getElementById('t2').value),
+                tier3_rate: parseFloat(document.getElementById('t3').value)
+            };
+            fetch('/api/admin/config', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) })
+            .then(res => res.json()).then(res => {
+                if(res.success) Toast.fire({ icon: 'success', title: 'Tariffs Updated Globally' });
+            });
+        }
+
+        function overrideRoom(id) {
+            const payload = {
+                sensorId: id,
+                balance: parseFloat(document.getElementById(`bal${id}`).value),
+                total_kwh: parseFloat(document.getElementById(`kwh${id}`).value),
+                relayStatus: document.getElementById(`rel${id}`).value
+            };
+            fetch('/api/admin/room-override', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) })
+            .then(res => res.json()).then(res => {
+                if(res.success) Toast.fire({ icon: 'success', title: `Room ${id===1?'A':'B'} Force Overridden` });
+            });
+        }
+
+        function zeroBalances() {
+            Swal.fire({
+                title: 'Are you sure?', text: "This will instantly trip both relays!", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'Yes, zero them!',
+                background: 'var(--card-bg)', color: 'var(--text-color)'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch('/api/admin/zero-balances', { method: 'POST', headers: getAuthHeaders() })
+                    .then(res => res.json()).then(res => {
+                        if(res.success) {
+                            loadAdminData();
+                            Swal.fire({title: 'Nuked!', text: 'Balances zeroed and relays tripped.', icon: 'success', background: 'var(--card-bg)', color: 'var(--text-color)'});
+                        }
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>

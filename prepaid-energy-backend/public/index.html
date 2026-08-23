@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Energy Dashboard</title>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-color: #f0f2f5; --text-color: #333; --card-bg: #ffffff; 
+            --header-bg: #1e293b; --accent-main: #f59e0b; --accent-a: #3b82f6; --accent-b: #8b5cf6;
+            --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); --border-radius: 16px;
+            --input-bg: #f8fafc; --input-border: #cbd5e1;
+        }
+
+        body.dark-mode {
+            --bg-color: #0f172a; --text-color: #f1f5f9; --card-bg: #1e293b; 
+            --header-bg: #0b1120; --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            --input-bg: #334155; --input-border: #475569;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 20px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; background: var(--header-bg); color: white; border-radius: var(--border-radius); margin-bottom: 30px; box-shadow: var(--box-shadow); }
+        .header-title h1 { font-size: 1.5em; display: flex; align-items: center; gap: 10px; color: var(--accent-main); }
+        .header-actions { display: flex; gap: 15px; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; border: none; }
+        .btn-toggle { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-toggle:hover { background: rgba(255,255,255,0.2); }
+        .btn-admin { background: var(--accent-main); color: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 30px; max-width: 1400px; margin: 0 auto; }
+        @media (min-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr 1fr; } }
+        
+        .card { background: var(--card-bg); border-radius: var(--border-radius); padding: 25px; box-shadow: var(--box-shadow); position: relative; overflow: hidden; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--input-border); }
+        .card-header h3 { font-size: 1.3em; display: flex; align-items: center; gap: 10px; }
+        
+        .main-card { grid-column: 1 / -1; background: linear-gradient(135deg, var(--header-bg), #1e293b); color: white; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+        .main-card .balance { font-size: 4em; font-weight: 800; color: var(--accent-main); text-shadow: 0 2px 10px rgba(245, 158, 11, 0.2); margin: 10px 0; }
+        .main-stats { display: flex; justify-content: space-around; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 1.2em; }
+        .main-chart-wrapper { height: 150px; width: 100%; margin-top: 20px; }
+
+        .room-balance-box { text-align: center; background: rgba(0,0,0,0.03); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--input-border); }
+        .room-balance { font-size: 2.5em; font-weight: bold; margin-top: 5px; }
+        .room-chart-wrapper { height: 120px; width: 100%; margin: 15px 0; }
+        
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .metric { background: var(--input-bg); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--input-border); }
+        .metric i { color: var(--accent-main); width: 20px; text-align: center; margin-right: 8px; }
+        
+        .topup-row { display: flex; gap: 10px; }
+        .topup-row input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-color); font-size: 1em; }
+        .topup-row button { background: #10b981; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .topup-row button:hover { background: #059669; }
+
+        .status-badge { padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 0.85em; text-transform: uppercase; animation: pulse 2s infinite; }
+        .status-ON { background: rgba(16, 185, 129, 0.2); color: #10b981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        .status-OFF { background: rgba(239, 68, 68, 0.2); color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); animation: pulse-red 2s infinite; }
+        
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        .val-flash { color: #10b981 !important; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1><i class="fas fa-bolt"></i> Shared ECG Dashboard</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-toggle" onclick="toggleDarkMode()"><i id="theme-icon" class="fas fa-moon"></i></button>
+            <a href="/admin.html" class="btn btn-admin"><i class="fas fa-sliders-h"></i> Admin Control</a>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        <!-- Main Combined System -->
+        <div class="card main-card">
+            <h3 style="color: rgba(255,255,255,0.7); font-weight: 500; letter-spacing: 1px;">TOTAL SYSTEM CREDIT</h3>
+            <div class="balance">GH₵ <span id="main-balance">0.0000</span></div>
+            <div class="main-chart-wrapper"><canvas id="chartMain"></canvas></div>
+            <div class="main-stats">
+                <div><i class="fas fa-tachometer-alt" style="color: var(--accent-main)"></i> Total Load: <strong id="main-power">0.0</strong> W</div>
+                <div><i class="fas fa-charging-station" style="color: var(--accent-main)"></i> Energy: <strong id="main-energy">0.000</strong> kWh</div>
+            </div>
+        </div>
+
+        <!-- Room A -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-door-closed" style="color: var(--accent-a)"></i> Room A (Sensor 1)</h3>
+                <span class="status-badge status-ON" id="status-1">ON</span>
+            </div>
+            <div class="room-balance-box">
+                <div style="font-size: 0.9em; opacity: 0.7;">Wallet Balance</div>
+                <div class="room-balance" style="color: var(--accent-a);">GH₵ <span id="balance-1" class="val-flash">0.0000</span></div>
+            </div>
+            <div class="room-chart-wrapper"><canvas id="chartRoom1"></canvas></div>
+            <div class="metrics-grid">
+                <div class="metric"><span><i class="fas fa-plug"></i> Volts</span><strong id="v-1">0 V</strong></div>
+                <div class="metric"><span><i class="fas fa-water"></i> Amps</span><strong id="c-1">0 A</strong></div>
+                <div class="metric"><span><i class="fas fa-lightbulb"></i> Load</span><strong id="p-1">0 W</strong></div>
+                <div class="metric"><span><i class="fas fa-battery-half"></i> kWh</span><strong id="e-1">0</strong></div>
+            </div>
+            <div class="topup-row">
+                <input type="number" id="input-topup-1" placeholder="Amount (GH₵)">
+                <button onclick="rechargeRoom(1)"><i class="fas fa-wallet"></i> Top Up</button>
+            </div>
+        </div>
+
+        <!-- Room B -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-door-closed" style="color: var(--accent-b)"></i> Room B (Sensor 2)</h3>
+                <span class="status-badge status-ON" id="status-2">ON</span>
+            </div>
+            <div class="room-balance-box">
+                <div style="font-size: 0.9em; opacity: 0.7;">Wallet Balance</div>
+                <div class="room-balance" style="color: var(--accent-b);">GH₵ <span id="balance-2" class="val-flash">0.0000</span></div>
+            </div>
+            <div class="room-chart-wrapper"><canvas id="chartRoom2"></canvas></div>
+            <div class="metrics-grid">
+                <div class="metric"><span><i class="fas fa-plug"></i> Volts</span><strong id="v-2">0 V</strong></div>
+                <div class="metric"><span><i class="fas fa-water"></i> Amps</span><strong id="c-2">0 A</strong></div>
+                <div class="metric"><span><i class="fas fa-lightbulb"></i> Load</span><strong id="p-2">0 W</strong></div>
+                <div class="metric"><span><i class="fas fa-battery-half"></i> kWh</span><strong id="e-2">0</strong></div>
+            </div>
+            <div class="topup-row">
+                <input type="number" id="input-topup-2" placeholder="Amount (GH₵)">
+                <button onclick="rechargeRoom(2)"><i class="fas fa-wallet"></i> Top Up</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        // Theme Setup
+        if(localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('theme-icon').classList.replace('fa-moon', 'fa-sun');
+        }
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('theme-icon').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            Chart.defaults.color = isDark ? '#cbd5e1' : '#64748b';
+            [chartMain, chartRoom1, chartRoom2].forEach(c => c.update());
+        }
+
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, background: 'var(--card-bg)', color: 'var(--text-color)' });
+
+        // Chart Configurations
+        Chart.defaults.color = document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#64748b';
+        Chart.defaults.font.family = 'Segoe UI';
+        
+        function createChart(ctxId, color, label) {
+            return new Chart(document.getElementById(ctxId).getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: label, data: [], borderColor: color, backgroundColor: `${color}33`, borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, scales: { x: { display: false }, y: { beginAtZero: true, border: {display: false} } }, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+            });
+        }
+
+        const chartMain = createChart('chartMain', '#f59e0b', 'Total Load (W)');
+        const chartRoom1 = createChart('chartRoom1', '#3b82f6', 'Room A Load (W)');
+        const chartRoom2 = createChart('chartRoom2', '#8b5cf6', 'Room B Load (W)');
+
+        function updateChart(chart, dataPoint) {
+            chart.data.labels.push('');
+            chart.data.datasets[0].data.push(dataPoint);
+            if (chart.data.labels.length > 40) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+            chart.update();
+        }
+
+        // Data Management
+        socket.on('main-meter-update', (data) => {
+            flashValue('main-balance', data.mainBalance.toFixed(4));
+            document.getElementById('main-power').innerText = data.totalActiveLoad.toFixed(1);
+            document.getElementById('main-energy').innerText = data.totalEnergy.toFixed(3);
+            updateChart(chartMain, data.totalActiveLoad);
+        });
+
+        socket.on('sensor-update', (data) => {
+            if (data.voltage !== undefined) document.getElementById(`v-${data.sensorId}`).innerText = `${data.voltage} V`;
+            if (data.current !== undefined) document.getElementById(`c-${data.sensorId}`).innerText = `${data.current} A`;
+            if (data.power !== undefined) {
+                document.getElementById(`p-${data.sensorId}`).innerText = `${data.power} W`;
+                updateChart(data.sensorId === 1 ? chartRoom1 : chartRoom2, data.power);
+            }
+            if (data.energy !== undefined) document.getElementById(`e-${data.sensorId}`).innerText = data.energy;
+            
+            if (data.balance !== undefined) {
+                let balEl = document.getElementById(`balance-${data.sensorId}`);
+                if(balEl.innerText !== data.balance.toFixed(4)) flashValue(`balance-${data.sensorId}`, data.balance.toFixed(4));
+            }
+            if (data.relayStatus !== undefined) {
+                const badge = document.getElementById(`status-${data.sensorId}`);
+                badge.innerText = data.relayStatus;
+                badge.className = `status-badge status-${data.relayStatus}`;
+            }
+        });
+
+        function flashValue(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.innerText = newValue;
+            el.classList.add('val-flash');
+            setTimeout(() => el.classList.remove('val-flash'), 300);
+        }
+
+        function rechargeRoom(id) {
+            const val = parseFloat(document.getElementById(`input-topup-${id}`).value);
+            if (!val || val <= 0) return Toast.fire({ icon: 'warning', title: 'Enter a valid amount' });
+            
+            fetch('/api/topup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ sensorId: id, amount: val }) })
+            .then(res => res.json())
+            .then(res => {
+                if(res.success) {
+                    Toast.fire({ icon: 'success', title: `Room ${id===1?'A':'B'} Topped Up!` });
+                    document.getElementById(`input-topup-${id}`).value = '';
+                } else Toast.fire({ icon: 'error', title: res.error });
+            });
+        }
+
+        // Initial Data load
+        fetch('/api/rooms').then(res => res.json()).then(rooms => {
+            let tb = 0, te = 0;
+            rooms.forEach(r => { 
+                tb += r.balance; te += r.total_kwh;
+                document.getElementById(`balance-${r.sensor_id}`).innerText = r.balance.toFixed(4);
+                document.getElementById(`e-${r.sensor_id}`).innerText = r.total_kwh;
+                const badge = document.getElementById(`status-${r.sensor_id}`);
+                badge.innerText = r.relay_status; badge.className = `status-badge status-${r.relay_status}`;
+            });
+            document.getElementById('main-balance').innerText = tb.toFixed(4);
+            document.getElementById('main-energy').innerText = te.toFixed(3);
+        });
+    </script>
+</body>
+</html>
